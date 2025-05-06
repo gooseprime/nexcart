@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import Image from "next/image"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,9 +12,9 @@ import type { Product } from "@/lib/supabase/database.types"
 import Link from "next/link"
 import { useCart } from "@/contexts/cart-context"
 import { motion } from "framer-motion"
-import { useState, useMemo } from "react"
+import { useState } from "react"
 
-// Define default images by category - moved outside component to avoid recreation
+// Define default images by category
 const DEFAULT_IMAGES = {
   Electronics: "https://images.unsplash.com/photo-1550009158-9ebf69173e03?q=80&w=1301&auto=format&fit=crop",
   Gadgets: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=2070&auto=format&fit=crop",
@@ -22,59 +23,16 @@ const DEFAULT_IMAGES = {
   Accessories: "https://images.unsplash.com/photo-1625929675093-a85aab94bffa?q=80&w=2071&auto=format&fit=crop",
 }
 
-// Pre-define category colors to avoid recalculation
-const CATEGORY_COLORS = {
-  Electronics: {
-    bg: "bg-vibrant-blue",
-    text: "text-vibrant-blue",
-    border: "border-vibrant-blue",
-    gradient: "from-vibrant-blue to-vibrant-purple",
-  },
-  Gadgets: {
-    bg: "bg-vibrant-purple",
-    text: "text-vibrant-purple",
-    border: "border-vibrant-purple",
-    gradient: "from-vibrant-purple to-vibrant-pink",
-  },
-  Tools: {
-    bg: "bg-vibrant-green",
-    text: "text-vibrant-green",
-    border: "border-vibrant-green",
-    gradient: "from-vibrant-green to-vibrant-blue",
-  },
-  Tool: {
-    bg: "bg-vibrant-green",
-    text: "text-vibrant-green",
-    border: "border-vibrant-green",
-    gradient: "from-vibrant-green to-vibrant-blue",
-  },
-  Accessories: {
-    bg: "bg-vibrant-pink",
-    text: "text-vibrant-pink",
-    border: "border-vibrant-pink",
-    gradient: "from-vibrant-pink to-vibrant-orange",
-  },
-}
-
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()
   const [isHovered, setIsHovered] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
-  const [imageLoaded, setImageLoaded] = useState(false)
 
-  // Memoize product image to avoid recalculation on re-renders
-  const productImage = useMemo(() => {
-    return (
-      product.image_url ||
-      DEFAULT_IMAGES[product.category as keyof typeof DEFAULT_IMAGES] ||
-      "https://images.unsplash.com/photo-1550009158-9ebf69173e03?q=80&w=1301&auto=format&fit=crop"
-    )
-  }, [product.image_url, product.category])
-
-  // Memoize category colors to avoid recalculation
-  const colors = useMemo(() => {
-    return CATEGORY_COLORS[product.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.Electronics
-  }, [product.category])
+  // Ensure product has an image
+  const productImage =
+    product.image_url ||
+    DEFAULT_IMAGES[product.category as keyof typeof DEFAULT_IMAGES] ||
+    "https://images.unsplash.com/photo-1550009158-9ebf69173e03?q=80&w=1301&auto=format&fit=crop"
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault() // Prevent navigation when clicking the button
@@ -88,8 +46,47 @@ export function ProductCard({ product }: { product: Product }) {
     setIsWishlisted(!isWishlisted)
   }
 
+  // Get a vibrant color based on the category
+  const getCategoryColor = (category: string) => {
+    const colors = {
+      Electronics: {
+        bg: "bg-vibrant-blue",
+        text: "text-vibrant-blue",
+        border: "border-vibrant-blue",
+        gradient: "from-vibrant-blue to-vibrant-purple",
+      },
+      Gadgets: {
+        bg: "bg-vibrant-purple",
+        text: "text-vibrant-purple",
+        border: "border-vibrant-purple",
+        gradient: "from-vibrant-purple to-vibrant-pink",
+      },
+      Tools: {
+        bg: "bg-vibrant-green",
+        text: "text-vibrant-green",
+        border: "border-vibrant-green",
+        gradient: "from-vibrant-green to-vibrant-blue",
+      },
+      Tool: {
+        bg: "bg-vibrant-green",
+        text: "text-vibrant-green",
+        border: "border-vibrant-green",
+        gradient: "from-vibrant-green to-vibrant-blue",
+      },
+      Accessories: {
+        bg: "bg-vibrant-pink",
+        text: "text-vibrant-pink",
+        border: "border-vibrant-pink",
+        gradient: "from-vibrant-pink to-vibrant-orange",
+      },
+    }
+    return colors[category as keyof typeof colors] || colors.Electronics
+  }
+
+  const colors = getCategoryColor(product.category)
+
   return (
-    <Link href={`/products/${product.id}`} prefetch={false}>
+    <Link href={`/products/${product.id}`}>
       <motion.div
         whileHover={{
           y: -12,
@@ -98,7 +95,6 @@ export function ProductCard({ product }: { product: Product }) {
         transition={{ duration: 0.3 }}
         onHoverStart={() => setIsHovered(true)}
         onHoverEnd={() => setIsHovered(false)}
-        layout
       >
         <Card className="overflow-hidden transition-all duration-300 rounded-2xl h-full border-0 shadow-lg">
           <div className="p-1 bg-gradient-to-br from-[var(--gradient-start)] to-[var(--gradient-end)]">
@@ -107,11 +103,7 @@ export function ProductCard({ product }: { product: Product }) {
                 src={productImage || "/placeholder.svg"}
                 alt={product.name}
                 fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className={`object-cover transition-all duration-500 ${isHovered ? "scale-110" : "scale-100"} ${!imageLoaded ? "opacity-0" : "opacity-100"}`}
-                onLoad={() => setImageLoaded(true)}
-                loading="lazy"
-                priority={false}
+                className={`object-cover transition-all duration-500 ${isHovered ? "scale-110" : "scale-100"}`}
               />
               {product.discount && (
                 <motion.div initial={{ x: 100 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 100 }}>

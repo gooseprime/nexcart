@@ -6,8 +6,6 @@ import { getSupabaseServer } from "@/lib/supabase/server"
 import { ProductCard } from "@/components/product-card"
 import { AIProductRecommendations } from "@/components/ai/ai-product-recommendations"
 import { ReviewCard } from "@/components/review-card"
-import { Suspense } from "react"
-import { LoadingFallback } from "@/components/ui/loading-fallback"
 
 // Update the reviews array with high-quality Unsplash profile images
 const reviews = [
@@ -61,13 +59,7 @@ const reviews = [
 // Helper function to get all products
 async function getAllProducts() {
   const supabase = getSupabaseServer()
-
-  // Optimize query to only fetch needed fields
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, name, description, price, original_price, rating, discount, category, image_url")
-    .order("created_at", { ascending: false })
-    .limit(12) // Limit to improve initial load time
+  const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
 
   if (error) {
     console.error("Error fetching products:", error)
@@ -77,20 +69,10 @@ async function getAllProducts() {
   return data || []
 }
 
-// Separate component for products section to enable suspense
-async function ProductsSection() {
+export default async function Home() {
+  // Fetch all products from Supabase
   const allProducts = await getAllProducts()
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      {allProducts.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </div>
-  )
-}
-
-export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -145,17 +127,17 @@ export default function Home() {
           </div>
         </div>
 
-        <Suspense fallback={<LoadingFallback />}>
-          <ProductsSection />
-        </Suspense>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {allProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
       </section>
 
       {/* AI Recommended Products */}
       <section className="py-16 bg-gradient-to-r from-vibrant-purple/5 to-vibrant-blue/5">
         <div className="container mx-auto px-4">
-          <Suspense fallback={<LoadingFallback />}>
-            <AIProductRecommendations title="AI Recommended Products For You" />
-          </Suspense>
+          <AIProductRecommendations title="AI Recommended Products For You" />
         </div>
       </section>
 

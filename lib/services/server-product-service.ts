@@ -1,14 +1,12 @@
 import { getSupabaseServer } from "@/lib/supabase/server"
 import type { Product } from "@/lib/supabase/database.types"
-import { cache } from "react"
 
-// Cache the product data for 1 minute to reduce database calls
-export const getProductsByCategory = cache(async (category: string): Promise<Product[]> => {
+export async function getProductsByCategory(category: string): Promise<Product[]> {
   try {
     const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from("products")
-      .select("id, name, description, price, original_price, rating, discount, category, image_url")
+      .select("*")
       .eq("category", category)
       .order("created_at", { ascending: false })
 
@@ -22,10 +20,9 @@ export const getProductsByCategory = cache(async (category: string): Promise<Pro
     console.error("Error in getProductsByCategory:", error)
     return []
   }
-})
+}
 
-// Cache the product data for individual products
-export const getProductById = cache(async (id: number): Promise<Product | null> => {
+export async function getProductById(id: number): Promise<Product | null> {
   try {
     const supabase = getSupabaseServer()
     const { data, error } = await supabase.from("products").select("*").eq("id", id).single()
@@ -40,10 +37,9 @@ export const getProductById = cache(async (id: number): Promise<Product | null> 
     console.error("Error in getProductById:", error)
     return null
   }
-})
+}
 
-// Cache categories for 5 minutes since they rarely change
-export const getCategories = cache(async (): Promise<{ id: number; name: string }[]> => {
+export async function getCategories(): Promise<{ id: number; name: string }[]> {
   try {
     const supabase = getSupabaseServer()
     const { data, error } = await supabase.from("categories").select("id, name").order("name")
@@ -58,17 +54,12 @@ export const getCategories = cache(async (): Promise<{ id: number; name: string 
     console.error("Error in getCategories:", error)
     return []
   }
-})
+}
 
-// Cache all products with pagination for better performance
-export const getAllProducts = cache(async (limit = 12, page = 0): Promise<Product[]> => {
+export async function getAllProducts(): Promise<Product[]> {
   try {
     const supabase = getSupabaseServer()
-    const { data, error } = await supabase
-      .from("products")
-      .select("id, name, description, price, original_price, rating, discount, category, image_url")
-      .order("created_at", { ascending: false })
-      .range(page * limit, (page + 1) * limit - 1)
+    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error fetching all products:", error)
@@ -80,4 +71,4 @@ export const getAllProducts = cache(async (limit = 12, page = 0): Promise<Produc
     console.error("Error in getAllProducts:", error)
     return []
   }
-})
+}
