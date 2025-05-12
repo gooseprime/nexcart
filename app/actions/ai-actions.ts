@@ -28,6 +28,8 @@ export async function generateAIResponse(
 
     const allMessages = [systemMessage, ...messages]
 
+    console.log("Sending request to OpenRouter API...")
+
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
       headers: {
@@ -45,11 +47,27 @@ export async function generateAIResponse(
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
+      const errorData = await response.json().catch(() => ({}))
+      console.error("OpenRouter API error response:", errorData)
       throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+
+    // Debug log the response structure
+    console.log("OpenRouter API response structure:", JSON.stringify(Object.keys(data)))
+
+    // Check if the response has the expected structure
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      console.error("Unexpected API response format:", data)
+      throw new Error("Received invalid response format from OpenRouter API")
+    }
+
+    if (!data.choices[0].message || typeof data.choices[0].message.content !== "string") {
+      console.error("Missing message content in API response:", data.choices[0])
+      throw new Error("Missing message content in API response")
+    }
+
     const aiResponse = data.choices[0].message.content
 
     // Save conversation to database if userId is provided
@@ -122,11 +140,24 @@ export async function getProductRecommendations(
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
+      const errorData = await response.json().catch(() => ({}))
+      console.error("OpenRouter API error response:", errorData)
       throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+
+    // Check if the response has the expected structure
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      console.error("Unexpected API response format:", data)
+      throw new Error("Received invalid response format from OpenRouter API")
+    }
+
+    if (!data.choices[0].message || typeof data.choices[0].message.content !== "string") {
+      console.error("Missing message content in API response:", data.choices[0])
+      throw new Error("Missing message content in API response")
+    }
+
     const content = data.choices[0].message.content
 
     // Parse the JSON response
@@ -145,9 +176,26 @@ export async function getProductRecommendations(
           }
         })
         .filter((rec) => rec.product !== null)
+
+      // If no recommendations were found, provide fallback
+      if (recommendations.length === 0) {
+        // Use 3 random products as fallback
+        recommendations = products.slice(0, 3).map((product) => ({
+          id: product.id,
+          name: product.name,
+          reason: "This product might be of interest to you.",
+          product,
+        }))
+      }
     } catch (parseError) {
-      console.error("Error parsing AI recommendations:", parseError)
-      throw new Error("Failed to parse product recommendations")
+      console.error("Error parsing AI recommendations:", parseError, "Raw content:", content)
+      // Use 3 random products as fallback
+      recommendations = products.slice(0, 3).map((product) => ({
+        id: product.id,
+        name: product.name,
+        reason: "This product might be of interest to you.",
+        product,
+      }))
     }
 
     // Save search query if userId is provided
@@ -229,20 +277,45 @@ export async function negotiatePrice(
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
+      const errorData = await response.json().catch(() => ({}))
+      console.error("OpenRouter API error response:", errorData)
       throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+
+    // Check if the response has the expected structure
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      console.error("Unexpected API response format:", data)
+      throw new Error("Received invalid response format from OpenRouter API")
+    }
+
+    if (!data.choices[0].message || typeof data.choices[0].message.content !== "string") {
+      console.error("Missing message content in API response:", data.choices[0])
+      throw new Error("Missing message content in API response")
+    }
+
     const content = data.choices[0].message.content
 
     // Parse the JSON response
     let negotiationResult: { message: string; counterOffer: number }
     try {
       negotiationResult = JSON.parse(content)
+
+      // Validate the parsed result
+      if (typeof negotiationResult.message !== "string" || typeof negotiationResult.counterOffer !== "number") {
+        throw new Error("Invalid negotiation result format")
+      }
     } catch (parseError) {
-      console.error("Error parsing negotiation response:", parseError)
-      throw new Error("Failed to parse negotiation response")
+      console.error("Error parsing negotiation response:", parseError, "Raw content:", content)
+      // Provide fallback negotiation result
+      const fallbackCounterOffer = accepted ? initialOffer : Math.round((originalPrice + initialOffer) / 2)
+      negotiationResult = {
+        message: accepted
+          ? "Thank you for your offer! We're happy to accept it."
+          : `Thank you for your interest! We can offer this product at $${fallbackCounterOffer.toFixed(2)}.`,
+        counterOffer: fallbackCounterOffer,
+      }
     }
 
     // Save negotiation if userId is provided

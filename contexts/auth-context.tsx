@@ -24,65 +24,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // Get the Supabase client once
-  const supabase = getSupabaseClient()
+  // Get the Supabase client once - but only on the client side
+  const supabase = typeof window !== "undefined" ? getSupabaseClient() : null
 
   useEffect(() => {
-    const setData = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-      if (error) {
-        console.error(error)
-        setIsLoading(false)
-        return
-      }
+    if (!supabase) return
 
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+    const setData = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+        if (error) {
+          console.error(error)
+          setIsLoading(false)
+          return
+        }
+
+        setSession(session)
+        setUser(session?.user ?? null)
+      } catch (err) {
+        console.error("Error getting session:", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      router.refresh()
-    })
+    let subscription: { unsubscribe: () => void } | null = null
+
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        router.refresh()
+      })
+      subscription = data.subscription
+    } catch (err) {
+      console.error("Error setting up auth state change listener:", err)
+    }
 
     setData()
 
     return () => {
-      subscription.unsubscribe()
+      subscription?.unsubscribe()
     }
   }, [router, supabase])
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    if (!supabase) return { error: new Error("Supabase client not available") }
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    })
-    return { error }
+      })
+      return { error }
+    } catch (err) {
+      console.error("Error during sign up:", err)
+      return { error: err }
+    }
   }
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { error }
+    if (!supabase) return { error: new Error("Supabase client not available") }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      return { error }
+    } catch (err) {
+      console.error("Error during sign in:", err)
+      return { error: err }
+    }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/")
+    if (!supabase) return
+
+    try {
+      await supabase.auth.signOut()
+      router.push("/")
+    } catch (err) {
+      console.error("Error during sign out:", err)
+    }
   }
 
   const value = {

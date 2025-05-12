@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, X, Loader2 } from "lucide-react"
 import { getProductRecommendations } from "@/app/actions/ai-actions"
-import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
@@ -21,7 +20,6 @@ export function AISearch() {
   const [error, setError] = useState<string | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const { user } = useAuth()
   const router = useRouter()
 
   // Close search when clicking outside
@@ -54,7 +52,8 @@ export function AISearch() {
     setError(null)
 
     try {
-      const { recommendations: results, error } = await getProductRecommendations(query, user?.id)
+      // Pass null for userId - the server action will handle guest users
+      const { recommendations: results, error } = await getProductRecommendations(query, null)
 
       if (error) {
         setError(error)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/contexts/auth-context"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,9 +12,87 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, LogOut, Settings, ShoppingBag, Bot } from "lucide-react"
 import Link from "next/link"
+import { getSupabaseClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+
+type UserData = {
+  id: string
+  email?: string
+  user_metadata?: {
+    full_name?: string
+    avatar_url?: string
+  }
+}
 
 export function UserMenu() {
-  const { user, signOut, isLoading } = useAuth()
+  const [user, setUser] = useState<UserData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === "undefined") return
+
+    const checkAuthStatus = async () => {
+      try {
+        setIsLoading(true)
+        const supabase = getSupabaseClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          setUser(session.user)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Error checking auth status:", error)
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    // Check auth status immediately
+    checkAuthStatus()
+
+    // Set up auth state change listener
+    let unsubscribe: (() => void) | undefined
+
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setUser(session.user)
+        } else {
+          setUser(null)
+        }
+      })
+
+      unsubscribe = () => subscription.unsubscribe()
+    } catch (error) {
+      console.error("Error setting up auth listener:", error)
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      await supabase.auth.signOut()
+      setUser(null)
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
 
   if (isLoading) {
     return <Button variant="ghost" size="sm" disabled className="h-9 w-9 rounded-full" />
@@ -41,7 +119,7 @@ export function UserMenu() {
         .map((n: string) => n[0])
         .join("")
         .toUpperCase()
-    : user.email?.[0].toUpperCase() || "U"
+    : user.email?.[0]?.toUpperCase() || "U"
 
   return (
     <DropdownMenu>
@@ -86,7 +164,7 @@ export function UserMenu() {
           </DropdownMenuItem>
         </Link>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()}>
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign out</span>
         </DropdownMenuItem>

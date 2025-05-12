@@ -2,29 +2,60 @@
 
 import { ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useCart } from "@/contexts/cart-context"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
 export function CartIcon() {
-  const { itemCount } = useCart()
+  const [itemCount, setItemCount] = useState(0)
   const [mounted, setMounted] = useState(false)
   const [hasItemsAdded, setHasItemsAdded] = useState(false)
 
-  // Fix hydration issues
+  // Fix hydration issues and load cart data from localStorage
   useEffect(() => {
     setMounted(true)
-  }, [])
 
-  // Track when items are added to animate the badge
-  useEffect(() => {
-    if (mounted && itemCount > 0) {
-      setHasItemsAdded(true)
-      const timer = setTimeout(() => setHasItemsAdded(false), 1000)
-      return () => clearTimeout(timer)
+    // Function to update cart count from localStorage
+    const updateCartCount = () => {
+      try {
+        const cartData = localStorage.getItem("nexcart-shopping-cart")
+        if (cartData) {
+          const parsedCart = JSON.parse(cartData)
+          const count = parsedCart.reduce((total: number, item: any) => total + (item.quantity || 0), 0)
+          setItemCount(count)
+          setHasItemsAdded(true)
+          setTimeout(() => setHasItemsAdded(false), 1000)
+        } else {
+          setItemCount(0)
+        }
+      } catch (error) {
+        console.error("Failed to load cart data:", error)
+      }
     }
-  }, [itemCount, mounted])
+
+    // Initial load
+    updateCartCount()
+
+    // Listen for custom cart update events
+    const handleCartUpdate = () => {
+      updateCartCount()
+    }
+
+    // Listen for storage events to update cart count when it changes in another tab
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "nexcart-shopping-cart" || e.key === "nexcart-shopping-cart-timestamp") {
+        updateCartCount()
+      }
+    }
+
+    window.addEventListener("cart-updated", handleCartUpdate)
+    window.addEventListener("storage", handleStorageChange)
+
+    return () => {
+      window.removeEventListener("cart-updated", handleCartUpdate)
+      window.removeEventListener("storage", handleStorageChange)
+    }
+  }, [])
 
   return (
     <Link href="/cart">

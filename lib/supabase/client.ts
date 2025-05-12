@@ -8,8 +8,8 @@ let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | n
 
 export const getSupabaseClient = () => {
   if (typeof window === "undefined") {
-    // Server-side - we should not reuse the client
-    return createClientComponentClient<Database>()
+    // Server-side - we should not create client component client on server
+    throw new Error("getSupabaseClient should not be called on the server. Use getSupabaseServer instead.")
   }
 
   // Client-side - use singleton pattern
